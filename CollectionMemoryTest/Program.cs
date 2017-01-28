@@ -39,7 +39,17 @@ namespace CollectionMemoryTest
             Console.WriteLine("------------------------");
             var t7 = ArrayArrayByteArray();
             Console.WriteLine("------------------------");
-
+            GC.Collect();
+            ReportMemory("Before interning");
+            Console.WriteLine("------------------------");
+            // String interning can itself lead to memory leaks - see https://msdn.microsoft.com/en-us/library/system.string.intern(v=vs.110).aspx
+            // However, these tests appear to not leak, soooo
+            // And if you have a lot of identical strings then it will save a *lot* of memory
+            // Unexpectedly, even with unique strings, String.Intern does not use *more* memory (though it may use more memrory *whilst* building the list
+            var t8 = InternedListDictStringString();
+            var t9 = InternedArrayArrayString();
+            var t10 = InternedArrayArrayWithSimilarStrings();
+            Console.WriteLine("------------------------");
 
             Console.WriteLine("Finished");
             GC.Collect();
@@ -59,7 +69,7 @@ namespace CollectionMemoryTest
             }
             //ReportMemory("ListListString Before GC");
             GC.Collect();
-            ReportMemory("ListListString After GC");
+            ReportMemory("ListListString");
 
             return records.Count; // Just trying to ensure it doesn't get optmised away
         }
@@ -92,7 +102,7 @@ namespace CollectionMemoryTest
                 }).ToList();
             }
             GC.Collect();
-            ReportMemory("ListArrayString After GC");
+            ReportMemory("ListArrayString");
 
             return records.Count; // Just trying to ensure it doesn't get optmised away
         }
@@ -128,7 +138,7 @@ namespace CollectionMemoryTest
                 }).ToArray();
             }
             GC.Collect();
-            ReportMemory("ArrayArrayString After GC");
+            ReportMemory("ArrayArrayString");
 
             return records.Length; // Just trying to ensure it doesn't get optmised away
         }
@@ -144,7 +154,7 @@ namespace CollectionMemoryTest
                     }).ToArray();
             }
             GC.Collect();
-            ReportMemory("ArrayArrayWithSimilarStrings After GC");
+            ReportMemory("ArrayArrayWithSimilarStrings");
 
             return records.Length; // Just trying to ensure it doesn't get optmised away
         }
@@ -166,7 +176,74 @@ namespace CollectionMemoryTest
                 }).ToList();
             }
             GC.Collect();
-            ReportMemory("ListDictStringString After GC");
+            ReportMemory("ListDictStringString");
+
+            return records.Count; // Just trying to ensure it doesn't get optmised away
+        }
+
+        /// <summary>
+        /// Interns all the field values
+        /// </summary>
+        /// <returns></returns>
+        private static int InternedArrayArrayString()
+        {
+            string[][] records;
+            using (var stringCreator = new RandomStringCreator.StringCreator(100000))
+            {
+                records = Enumerable.Range(0, numRecords).Select(r =>
+                {
+                    return Enumerable.Range(0, numColumns).Select(c => stringCreator.Get(valueLength)).ToArray();
+                }).ToArray();
+            }
+            GC.Collect();
+            ReportMemory("Interned ArrayArrayString");
+
+            return records.Length; // Just trying to ensure it doesn't get optmised away
+        }
+
+        /// <summary>
+        /// Interns all the field values
+        /// </summary>
+        /// <returns></returns>
+        private static int InternedArrayArrayWithSimilarStrings()
+        {
+            // All rows are identical, though each column in each row is different
+            string[][] records;
+            {
+                records = Enumerable.Range(0, numRecords).Select(r =>
+                {
+                    return Enumerable.Range(0, numColumns).Select(c => String.Intern(c.ToString().PadLeft(valueLength))).ToArray();
+                }).ToArray();
+            }
+            GC.Collect();
+            ReportMemory("Interned ArrayArrayWithSimilarStrings");
+
+            return records.Length; // Just trying to ensure it doesn't get optmised away
+        }
+
+        /// <summary>
+        /// This Interns the field names to see how that compares to the "normal" dictionary approach
+        /// It saves *a lot* compared to the "normal" dictionary approach so worth considering if you need the dict
+        /// </summary>
+        /// <returns></returns>
+        private static int InternedListDictStringString()
+        {
+            var records = new List<Dictionary<string, string>>();
+            using (var stringCreator = new RandomStringCreator.StringCreator(100000))
+            {
+                records = Enumerable.Range(0, numRecords).Select(r =>
+                {
+                    var dict = new Dictionary<string, string>();
+                    for (int i = 0; i < numColumns; i++)
+                    {
+                        dict.Add(String.Intern($"Field{i}"), stringCreator.Get(valueLength));
+                    }
+
+                    return dict;
+                }).ToList();
+            }
+            GC.Collect();
+            ReportMemory("Interned ListDictStringString");
 
             return records.Count; // Just trying to ensure it doesn't get optmised away
         }
@@ -174,7 +251,7 @@ namespace CollectionMemoryTest
         private static void ReportMemory(string label)
         {
             double mem = GC.GetTotalMemory(false);
-            Console.WriteLine($"{label.PadRight(30)}. \t{mem/1024/1024:N1}Mb \t{mem/1024:N1}Kb \t{mem:N0} bytes");
+            Console.WriteLine($"{label.PadRight(30)} \t{mem/1024/1024:N1}Mb \t{mem/1024:N1}Kb \t{mem:N0} bytes");
         }
     }
 }
