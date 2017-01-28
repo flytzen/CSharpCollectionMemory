@@ -22,7 +22,7 @@ namespace CollectionMemoryTest
         static void Main(string[] args)
         {
             double theoreticalSize = numRecords * numColumns * valueLength;
-            Console.WriteLine($"Theoretical data size: {theoreticalSize / 1024 / 1024:N1}Mb / {theoreticalSize / 1024:N1}Kb / {theoreticalSize:N0} bytes");
+            Console.WriteLine($"Theoretical data size: {theoreticalSize / 1024 / 1024:N1}Mb \t{theoreticalSize / 1024:N1}Kb \t{theoreticalSize:N0} bytes");
             ReportMemory("Before starting test");
             Console.WriteLine("------------------------");
             var t = ListListString();
@@ -32,6 +32,10 @@ namespace CollectionMemoryTest
             var t3 = ListArrayString();
             Console.WriteLine("------------------------");
             var t4 = ListDictStringString();
+            Console.WriteLine("------------------------");
+            var t5 = ArrayArrayString();
+            Console.WriteLine("------------------------");
+            var t6 = ArrayArrayWithSimilarStrings();
             Console.WriteLine("------------------------");
 
             Console.WriteLine("Finished");
@@ -90,6 +94,38 @@ namespace CollectionMemoryTest
             return records.Count; // Just trying to ensure it doesn't get optmised away
         }
 
+        private static int ArrayArrayString()
+        {
+            string[][] records;
+            using (var stringCreator = new RandomStringCreator.StringCreator(100000))
+            {
+                records = Enumerable.Range(0, numRecords).Select(r =>
+                {
+                    return Enumerable.Range(0, numColumns).Select(c => stringCreator.Get(valueLength)).ToArray();
+                }).ToArray();
+            }
+            GC.Collect();
+            ReportMemory("ArrayArrayString After GC");
+
+            return records.Length; // Just trying to ensure it doesn't get optmised away
+        }
+
+        private static int ArrayArrayWithSimilarStrings()
+        {
+            // All rows are identical, though each column in each row is different
+            string[][] records;
+            {
+                records = Enumerable.Range(0, numRecords).Select(r =>
+                    {
+                        return Enumerable.Range(0, numColumns).Select(c => c.ToString().PadLeft(valueLength)).ToArray();
+                    }).ToArray();
+            }
+            GC.Collect();
+            ReportMemory("ArrayArrayWithSimilarStrings After GC");
+
+            return records.Length; // Just trying to ensure it doesn't get optmised away
+        }
+
         private static int ListDictStringString()
         {
             var records = new List<Dictionary<string,string>>();
@@ -115,7 +151,7 @@ namespace CollectionMemoryTest
         private static void ReportMemory(string label)
         {
             double mem = GC.GetTotalMemory(false);
-            Console.WriteLine($"{label}. {mem/1024/1024:N1}Mb / {mem/1024:N1}Kb / {mem:N0} bytes");
+            Console.WriteLine($"{label.PadRight(30)}. \t{mem/1024/1024:N1}Mb \t{mem/1024:N1}Kb \t{mem:N0} bytes");
         }
     }
 }
