@@ -16,7 +16,7 @@ namespace CollectionMemoryTest
 
         const int numColumns = 20;
 
-        const int valueLength = 10;
+        const int valueLength = 20;
 
         // [CompilationRelaxations(CompilationRelaxations.NoStringInterning)]
         static void Main(string[] args)
@@ -37,6 +37,9 @@ namespace CollectionMemoryTest
             Console.WriteLine("------------------------");
             var t6 = ArrayArrayWithSimilarStrings();
             Console.WriteLine("------------------------");
+            var t7 = ArrayArrayByteArray();
+            Console.WriteLine("------------------------");
+
 
             Console.WriteLine("Finished");
             GC.Collect();
@@ -92,6 +95,26 @@ namespace CollectionMemoryTest
             ReportMemory("ListArrayString After GC");
 
             return records.Count; // Just trying to ensure it doesn't get optmised away
+        }
+
+        private static int ArrayArrayByteArray()
+        {
+            // This particular one takes advantage of the fact that strings in .Net are stored as UTF-16, meaning each character is always 2 bytes
+            // if you are confident your data fit into UTF-8 then you can save some memory; the longer the strings, the bigger the effect
+            // See http://stackoverflow.com/questions/3967411/how-many-bytes-will-a-string-take-up
+
+            byte[][][] records;
+            using (var stringCreator = new RandomStringCreator.StringCreator(100000))
+            {
+                records = Enumerable.Range(0, numRecords).Select(r =>
+                {
+                    return Enumerable.Range(0, numColumns).Select(c => Encoding.UTF8.GetBytes(stringCreator.Get(valueLength))).ToArray();
+                }).ToArray();
+            }
+            GC.Collect();
+            ReportMemory("ArrayArrayByteArray");
+
+            return records.Length; // Just trying to ensure it doesn't get optmised away
         }
 
         private static int ArrayArrayString()
